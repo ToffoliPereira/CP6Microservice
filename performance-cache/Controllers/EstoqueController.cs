@@ -12,11 +12,11 @@ namespace performance_cache.Controllers
     public class EstoqueController : ControllerBase
     {
         private const string cacheKey = "estoques-cache";
-        private readonly IEstoqueRepository estoqueRepository;
+        private readonly IEmprestimoRepository estoqueRepository;
         private readonly ICacheService cacheService;
         private readonly ILogger<EstoqueController> logger;
 
-        public EstoqueController(IEstoqueRepository estoqueRepository, ICacheService cacheService, ILogger<EstoqueController> logger)
+        public EstoqueController(IEmprestimoRepository estoqueRepository, ICacheService cacheService, ILogger<EstoqueController> logger)
         {
             this.estoqueRepository = estoqueRepository;
             this.cacheService = cacheService;

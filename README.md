@@ -1,8 +1,8 @@
-# 🏪 Sistema de Gestão de Estoque
+# 📚 Sistema de Gestão de Biblioteca
 
 ## 📋 Descrição do Projeto
 
-Aplicação desenvolvida em C# com MySQL, para gerenciar produtos perecíveis e não perecíveis, controlando estoque, movimentações e alertas automáticos.
+Aplicação desenvolvida em C# com MySQL, para gerenciar livros, usuários e empréstimos em uma biblioteca. A aplicação permite o cadastro de livros e usuários, controle de empréstimos e devoluções, cálculo de multas por atraso e geração de relatórios.
 
 
 ## 🧩 Estrutura do Projeto
@@ -11,89 +11,180 @@ Aplicação desenvolvida em C# com MySQL, para gerenciar produtos perecíveis e 
 📁 Service/
 ├── 📄 ICacheService.cs      # Interface do serviço de cache
 ├── 📄 CacheService.cs       # Implementação do serviço de cache
+├── 📄 IEmprestimoService.cs      # Interface do serviço de emprestimo
+├── 📄 EmprestimoService.cs       # Implementação do serviço de emprestimo
+├── 📄 ILivroService.cs      # Interface do serviço de livro
+├── 📄 LivroService.cs       # Implementação do serviço de livro
+├── 📄 IRelatorioService.cs      # Interface do serviço de relatorio
+├── 📄 RelatorioService.cs       # Implementação do serviço de relatorio
+├── 📄 IUsuarioService.cs      # Interface do serviço de usuario
+├── 📄 UsuarioService.cs       # Implementação do serviço de usuario
 └── 📄 Service.csproj        # Dependências do projeto
 ```
 
 ## 🧱 Modelagem do Banco de Dados
 
 ```
-CREATE DATABASE CP5;
-USE CP5;
+CREATE DATABASE `cp6`;
 
-CREATE TABLE Produtos (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    Nome VARCHAR(45),
-    Categoria VARCHAR(45),
-    PrecoUnitario NUMERIC(10,2),
-    QtdMin NUMERIC(10),
-    DataCriacao DATETIME DEFAULT NOW()
+USE `cp6`;
+
+CREATE TABLE livros (
+	`Isbn` INT NOT NULL auto_increment,
+    `Titulo` VARCHAR(45) NOT NULL,
+    `Autor` VARCHAR(45) NOT NULL,
+    `Categoria` VARCHAR(45) NOT NULL,
+    `Status` VARCHAR(45) NOT NULL,
+    `DataCadastro` datetime NOT NULL,
+PRIMARY KEY(`Isbn`));
+
+CREATE TABLE usuarios (
+	`Id` INT NOT NULL auto_increment,
+    `Nome` VARCHAR(45) NOT NULL,
+    `Email` VARCHAR(45) NOT NULL,
+    `Tipo` VARCHAR(45) NOT NULL,
+    `DataCadastro` datetime NOT NULL,
+PRIMARY KEY(`Id`));
+
+CREATE TABLE emprestimos (
+	`IdEmprestimo` INT NOT NULL auto_increment,
+    `IsbnLivro` INT NOT NULL,
+    `IdUsuario` INT NOT NULL,
+    `DataEmprestimo` datetime NOT NULL,
+    `DataPrevDevolucao` datetime NOT NULL,
+    `DataRealDevolucao` datetime,
+    `Status` VARCHAR(45) NOT NULL,
+    FOREIGN KEY (IsbnLivro) REFERENCES livros(Isbn),
+    FOREIGN KEY (IdUsuario) REFERENCES usuarios(Id),
+PRIMARY KEY(`IdEmprestimo`));
+
+CREATE TABLE multas (
+	`IdEmprestimo` INT NOT NULL,
+    `ValorMulta` numeric(10,2) NOT NULL,
+    `Status` VARCHAR(45) NOT NULL,
+    FOREIGN KEY (IdEmprestimo) REFERENCES emprestimos(IdEmprestimo)
 );
-
-CREATE TABLE Estoque (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    IdProduto INT,
-    Tipo VARCHAR(45),
-    Qtd NUMERIC(10),
-    DataMovimentacao DATETIME DEFAULT NOW(),
-    Lote NUMERIC(10),
-    DataValidade DATETIME,
-    FOREIGN KEY (IdProduto) REFERENCES Produtos(Id)
 );
 ```
 
 ## ⚙️ Regras de Negócio
 
-- Produtos perecíveis exigem lote e data de validade.
+- Cadastro de Livros: O livro é identificado pelo ISBN. Possui informações como título, autor, categoria e status (DISPONÍVEL, EMPRESTADO, RESERVADO).
 
-- Quantidades não podem ser negativas.
+- Cadastro de Usuários: O usuário é identificado por um ID e possui informações como nome, e-mail e tipo (ALUNO, PROFESSOR, FUNCIONÁRIO).
 
-- Saídas verificam estoque suficiente.
+- Empréstimo de Livros:
 
-- Atualização automática do saldo após movimentação.
+  - - O usuário pode realizar até 3 empréstimos ativos simultaneamente.
 
-- Alerta para estoque abaixo do mínimo.
+  - - O livro emprestado não pode ser reservado até ser devolvido.
 
-- Relatórios de produtos vencendo em até 7 dias.
+  - - O livro só pode ser emprestado se disponível.
+
+  - - O prazo de empréstimo varia dependendo do tipo de usuário (alunos têm prazo menor que professores).
+
+- Devolução de Livros:
+
+  - - Ao devolver o livro fora do prazo, uma multa é gerada automaticamente.
+
+  - - O cálculo da multa é de R$ 1,00 por dia de atraso.
+
+  - - Usuários com multas pendentes não podem realizar novos empréstimos.
+
+- Relatórios:
+
+  - - Livros mais emprestados.
+
+  - - Usuários com mais empréstimos.
+
+  - - Empréstimos em atraso.
 
 ### 🧪 Validações e Erros
 
-- ❌ Produto perecível sem validade → erro
+- ❌ Livro já emprestado não pode ser reservado ou emprestado novamente.
 
-- ❌ Movimentação negativa → erro
+- ❌ Usuário com mais de 3 empréstimos ativos não pode realizar um novo empréstimo.
 
-- ❌ Saída maior que o estoque → erro
+- ❌ Tentativa de devolução sem empréstimo ativo.
 
-- ⚠️ Produto abaixo do mínimo → alerta
+- ⚠️ Livro abaixo do limite mínimo de estoque (para livros físicos) gera alerta.
+
+- ❌ Produto vencido não pode ser emprestado ou devolvido.
 
 Exceções:
 
-EstoqueInsuficienteException
-ProdutoVencidoException
-QuantidadeInvalidaException
+- `LivroIndisponivelException`
+
+- `LimiteEmprestimosExcedidoException`
+
+- `MultaPendenteException`
+
+- `LivroVencidoException`
 
 ## 📊 Exemplos de API
 
+
+POST `/api/livros`
+
 ```
-POST /api/produtos
 
 {
-  "nome": "Leite Integral",
-  "categoria": "PERECIVEL",
-  "precoUnitario": 6.50,
-  "qtdMin": 10
+  "isbn": "978-3-16-148410-0",
+  "titulo": "Introdução à Programação",
+  "autor": "João Silva",
+  "categoria": "TÉCNICO",
+  "status": "DISPONÍVEL"
 }
 
+```
 
-POST /api/estoque
+POST `/api/usuarios`
+
+```
 
 {
-  "idProduto": 1,
-  "tipo": "SAIDA",
-  "qtd": 5,
-  "lote": 123,
-  "dataValidade": "2025-11-10"
+  "nome": "Maria Oliveira",
+  "email": "maria.oliveira@example.com",
+  "tipo": "ALUNO"
 }
+
 ```
+
+POST `/api/emprestimos`
+
+```
+
+{
+  "isbnLivro": "978-3-16-148410-0",
+  "idUsuario": 1,
+  "dataEmprestimo": "2025-11-01T00:00:00",
+  "dataPrevDevolucao": "2025-11-15T00:00:00"
+}
+
+```
+
+POST `/api/devolucoes`
+
+```
+
+{
+  "idEmprestimo": 123,
+  "dataRealDevolucao": "2025-11-18T00:00:00"
+}
+
+```
+
+Listar Livros Mais Emprestados
+
+GET `/api/livros/mais-emprestados`
+
+Listar Usuários com Mais Empréstimos
+
+GET `/api/usuarios/mais-emprestimos`
+
+Listar Empréstimos em Atraso
+
+GET `/api/emprestimos/atrasados`
 
 ## 🚀 Execução
 
@@ -103,7 +194,7 @@ Configurar conexão no appsettings.json:
 
 ```
 "ConnectionStrings": {
-  "DefaultConnection": "Server=localhost;Database=CP5;Uid=root;Pwd=;"
+  "DefaultConnection": "Server=localhost;Database=CP6;Uid=root;Pwd=senha;"
 }
 ```
 
@@ -117,10 +208,11 @@ Acessar: http://localhost:5000/api
 
 - Etapa	Commit
 
-- Etapa 1	Etapa 1 - Modelagem do domínio
+- Etapa 1: Commit com a mensagem "Etapa 1 - Modelagem do domínio"
 
-- Etapa 2	Etapa 2 - Implementação das regras de negócio
+- Etapa 2: Commit com a mensagem "Etapa 2 - Implementação das regras de negócio"
 
-- Etapa 3	Etapa 3 - Validações e tratamento de erros
+- Etapa 3: Commit com a mensagem "Etapa 3 - Validações e tratamento de erros"
 
-- Final	Etapa 4 - Documentação final
+- Final: Commit final com documentação e tag "versao-final"
+
